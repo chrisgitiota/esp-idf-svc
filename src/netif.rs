@@ -207,6 +207,7 @@ impl EspNetif {
     ) -> Result<Self, EspError> {
         let c_if_key = CString::new(conf.key.as_str()).unwrap();
         let c_if_description = CString::new(conf.description.as_str()).unwrap();
+        let mut bridge_info = bridgeif_config::default();
 
         let initial_mac = if let Some(custom_mac) = conf.custom_mac {
             custom_mac
@@ -237,6 +238,7 @@ impl EspNetif {
         {
             InterfaceIpConfiguration::Client(ref ip_conf) => (
                 esp_netif_inherent_config_t {
+                    bridge_info: &mut bridge_info,
                     flags: match ip_conf {
                         ipv4::ClientConfiguration::DHCP(_) => {
                             esp_netif_flags_ESP_NETIF_DHCP_CLIENT
@@ -297,6 +299,7 @@ impl EspNetif {
             ),
             InterfaceIpConfiguration::Router(ref ip_conf) => (
                 esp_netif_inherent_config_t {
+                    bridge_info: &mut bridge_info,
                     flags: (if ip_conf.dhcp_enabled {
                         esp_netif_flags_ESP_NETIF_DHCP_SERVER
                     } else {

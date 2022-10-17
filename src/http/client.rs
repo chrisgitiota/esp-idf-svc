@@ -64,6 +64,7 @@ pub struct EspHttpClientConfiguration {
     pub buffer_size: Option<usize>,
     pub buffer_size_tx: Option<usize>,
     pub follow_redirects_policy: FollowRedirectsPolicy,
+    pub timeout_ms: Option<i32>,
 
     pub use_global_ca_store: bool,
     #[cfg(not(esp_idf_version = "4.3"))]
@@ -75,6 +76,12 @@ pub struct EspHttpClient {
     raw: esp_http_client_handle_t,
     follow_redirects_policy: FollowRedirectsPolicy,
     event_handler: Box<Option<Box<dyn Fn(&esp_http_client_event_t) -> esp_err_t>>>,
+}
+
+impl Default for EspHttpClient {
+    fn default() -> Self {
+        Self::new_default().expect("Default instance creation is not possible")
+    }
 }
 
 impl EspHttpClient {
@@ -105,6 +112,10 @@ impl EspHttpClient {
 
         if let Some(buffer_size_tx) = configuration.buffer_size_tx {
             native_config.buffer_size_tx = buffer_size_tx as _;
+        }
+
+        if let Some(timeout_ms) = configuration.timeout_ms {
+            native_config.timeout_ms = timeout_ms as _;
         }
 
         let raw = unsafe { esp_http_client_init(&native_config) };

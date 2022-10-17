@@ -60,7 +60,6 @@ pub struct InterfaceConfiguration {
     pub route_priority: u32,
     pub ip_configuration: InterfaceIpConfiguration,
     pub interface_stack: InterfaceStack,
-    pub custom_mac: Option<[u8; 6]>,
 }
 
 impl Default for InterfaceConfiguration {
@@ -77,7 +76,6 @@ impl InterfaceConfiguration {
             route_priority: 60,
             ip_configuration: InterfaceIpConfiguration::Client(Default::default()),
             interface_stack: InterfaceStack::Eth,
-            custom_mac: None,
         }
     }
 
@@ -88,7 +86,6 @@ impl InterfaceConfiguration {
             route_priority: 50,
             ip_configuration: InterfaceIpConfiguration::Router(Default::default()),
             interface_stack: InterfaceStack::Eth,
-            custom_mac: None,
         }
     }
 
@@ -99,7 +96,6 @@ impl InterfaceConfiguration {
             route_priority: 100,
             ip_configuration: InterfaceIpConfiguration::Client(Default::default()),
             interface_stack: InterfaceStack::Sta,
-            custom_mac: None,
         }
     }
 
@@ -110,7 +106,6 @@ impl InterfaceConfiguration {
             route_priority: 10,
             ip_configuration: InterfaceIpConfiguration::Router(Default::default()),
             interface_stack: InterfaceStack::Ap,
-            custom_mac: None,
         }
     }
 
@@ -122,7 +117,6 @@ impl InterfaceConfiguration {
             route_priority: 30,
             ip_configuration: InterfaceIpConfiguration::Client(Default::default()),
             interface_stack: InterfaceStack::Ppp,
-            custom_mac: None,
         }
     }
 
@@ -134,7 +128,6 @@ impl InterfaceConfiguration {
             route_priority: 20,
             ip_configuration: InterfaceIpConfiguration::Router(Default::default()),
             interface_stack: InterfaceStack::Ppp,
-            custom_mac: None,
         }
     }
 
@@ -146,7 +139,6 @@ impl InterfaceConfiguration {
             route_priority: 35,
             ip_configuration: InterfaceIpConfiguration::Client(Default::default()),
             interface_stack: InterfaceStack::Slip,
-            custom_mac: None,
         }
     }
 
@@ -158,7 +150,6 @@ impl InterfaceConfiguration {
             route_priority: 25,
             ip_configuration: InterfaceIpConfiguration::Router(Default::default()),
             interface_stack: InterfaceStack::Slip,
-            custom_mac: None,
         }
     }
 }
@@ -209,30 +200,6 @@ impl EspNetif {
         let c_if_description = CString::new(conf.description.as_str()).unwrap();
         let mut bridge_info = bridgeif_config::default();
 
-        let initial_mac = if let Some(custom_mac) = conf.custom_mac {
-            custom_mac
-        } else {
-            let mut mac = [0; 6];
-            match conf.interface_stack {
-                InterfaceStack::Sta => esp!(unsafe {
-                    esp_read_mac(mac.as_mut_ptr() as *mut _, esp_mac_type_t_ESP_MAC_WIFI_STA)
-                })?,
-                InterfaceStack::Ap => esp!(unsafe {
-                    esp_read_mac(
-                        mac.as_mut_ptr() as *mut _,
-                        esp_mac_type_t_ESP_MAC_WIFI_SOFTAP,
-                    )
-                })?,
-                InterfaceStack::Eth => esp!(unsafe {
-                    esp_read_mac(mac.as_mut_ptr() as *mut _, esp_mac_type_t_ESP_MAC_ETH)
-                })?,
-                #[cfg(esp_idf_slip_support)]
-                #[cfg(esp_idf_ppp_support)]
-                _ => {}
-            };
-            mac
-        };
-
         let (mut esp_inherent_config, ip_info, dhcps, dns, secondary_dns, hostname) = match conf
             .ip_configuration
         {
@@ -249,7 +216,7 @@ impl EspNetif {
                             esp_netif_flags_ESP_NETIF_FLAG_AUTOUP
                         }
                     },
-                    mac: initial_mac,
+                    mac: [0; 6],
                     ip_info: ptr::null(),
                     get_ip_event: match ip_conf {
                         ipv4::ClientConfiguration::DHCP(_) => {
@@ -305,7 +272,7 @@ impl EspNetif {
                     } else {
                         0
                     }) | esp_netif_flags_ESP_NETIF_FLAG_AUTOUP,
-                    mac: initial_mac,
+                    mac: [0; 6],
                     ip_info: ptr::null(),
                     get_ip_event: 0,
                     lost_ip_event: 0,
@@ -403,11 +370,6 @@ impl EspNetif {
 
         esp!(unsafe { esp_netif_get_mac(self.1, mac.as_mut_ptr() as *mut _) })?;
         Ok(mac)
-    }
-
-    pub fn set_mac(&mut self, mac: &[u8; 6]) -> Result<(), EspError> {
-        esp!(unsafe { esp_netif_set_mac(self.1, mac.as_ptr() as *mut _) })?;
-        Ok(())
     }
 
     pub fn get_dns(&self) -> ipv4::Ipv4Addr {
